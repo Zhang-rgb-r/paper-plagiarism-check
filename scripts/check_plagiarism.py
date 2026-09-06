@@ -209,6 +209,89 @@ def band(ratio: float) -> str:
     return "低 ✅"
 
 
+# ------------------------------------------------- 引用识别 / 章节划分 (v2)
+
+_SECTION_HEAD_RE = re.compile(
+    r"^\s*(第[一二三四五六七八九十百0-9]+[章节讲]"
+    r"|摘\s*要|摘\u3000要|Abstract|ABSTRACT"
+    r"|引\s*言|引\u3000言|绪\s*论|结\s*论|总结与展望|致\s*谢"
+    r"|参考文献|References|REFERENCES"
+    r"|[0-9]+(?:\.[0-9]+)*\s+\S)")
+_BIB_HEAD_RE = re.compile(r"^\s*(参考文献|References|REFERENCES|文\s*献)\s*$")
+_REF_ENTRY_RE = re.compile(r"^\s*(\[\d+\]|\(\d+\)|\d+[.)、]|〔\d+〕)")
+_CITE_MARK_RE = re.compile(r"\[\s*\d+\s*(?:[-–,，;；]\s*\d+\s*)*\]|\(\s*\d{1,3}\s*\)|〔\s*\d+\s*〕")
+_QUOTE_PAIR_RE = re.compile(r"[“\"]([^“”\"]{8,})[”\"]")
+
+
+def split_sections(paper: "Doc"):
+    """按标题行划分章节,返回 [(章节名, 起始段, 结束段)](闭区间,标题行计入本章)。"""
+    heads = []
+    for pi, para in enumerate(paper.paras):
+        if len(para) < 40 and _SECTION_HEAD_RE.match(para):
+            heads.append((pi, para.strip()))
+    if not heads:
+        return [("全文", 0, len(paper.paras) - 1)]
+    sections = []
+    if heads[0][0] > 0:
+        sections.append(("正文开头", 0, heads[0][0] - 1))
+    for i, (pi, title) in enumerate(heads):
+        end = heads[i + 1][0] - 1 if i + 1 < len(heads) else len(paper.paras) - 1
+        sections.append((title, pi, end))
+    return sections
+
+
+def extract_bibliography(paper: "Doc"):
+    """抽取文末参考文献列表,返回 (文献词元集合, 起始段) 或 (None, None)。"""
+    start = None
+    for pi, para in enumerate(paper.paras):
+        if len(para) < 15 and _BIB_HEAD_RE.match(para):
+            start = pi + 1
+            break
+    if start is None:
+        return None, None
+    bib_tokens = set()
+    for para in paper.paras[start:]:
+        if len(para) < 40 and _SECTION_HEAD_RE.match(para) and not _REF_ENTRY_RE.match(para):
+            break
+        for m in TOKEN_RE.finditer(para):
+            bib_tokens.add(unicodedata.normalize("NFKC", m.group(0)).casefold())
+    return (bib_tokens, start) if bib_tokens else (None, start)
+
+
+def _run_text(paper: "Doc", a: int, b: int, tail: int = 0) -> str:
+    """片段的原文文本;tail 为结束时向后多取的字符数(用于看引文标记)。"""
+    pieces = []
+    i = a
+    while i <= b:
+        pi = paper.meta[i][0]
+        j = i
+        while j < b and paper.meta[j + 1][0] == pi:
+            j += 1
+        s, e = paper.meta[i][1], paper.meta[j][2]
+        para = paper.paras[pi]
+        t = para[s:e]
+        if tail and j == b:
+            t += para[e:e + tail]
+        pieces.append(t)
+        i = j + 1
+    return " ".join(pieces)
+
+
+def classify_run(paper: "Doc", a: int, b: int, bib_tokens) -> str:
+    """把重复片段归类:文献列表 / 引用 / 疑似抄袭(知网式)。"""
+    run_tok = paper.tokens[a:b + 1]
+    if bib_tokens and sum(t in bib_tokens for t in run_tok) / max(1, len(run_tok)) >= 0.80:
+        return "文献列表"
+    text = _run_text(paper, a, b, tail=60)
+    if _CITE_MARK_RE.search(text):
+        return "引用"
+    s = paper.meta[a][1]
+    para_head = paper.paras[paper.meta[a][0]][max(0, s - 2):s]
+    if para_head.endswith(("“", "\"")) and _QUOTE_PAIR_RE.search(para_head + text):
+        return "引用"
+    return "疑似抄袭"
+
+
 # ---------------------------------------------------------------- 摘录
 
 def excerpt_md(doc: Doc, a: int, b: int, ctx: int = 6, bold: bool = True) -> str:
@@ -325,9 +408,41 @@ def analyze(paper: Doc, refs: list[Doc], k: int = 0, min_run: int = 0,
         for i in r["source_idxs"]:
             counts[i] += 1
 
+    # ---- v2:引用识别 / 文献列表归类 / 知网式指标 / 分章节复制比 ----
+    bib_tokens, _bib_start = extract_bibliography(paper)
+    for r in runs_info:
+        r["kind"] = classify_run(paper, r["a"], r["b"], bib_tokens)
+    cited_chars = sum(r["tokens"] for r in runs_info if r["kind"] == "引用")
+    bib_chars = sum(r["tokens"] for r in runs_info if r["kind"] == "文献列表")
+    copy_chars = max(0, union_count - cited_chars - bib_chars)
+
+    para_tokens = [0] * len(paper.paras)
+    para_cov = [0] * len(paper.paras)
+    for j in range(n):
+        pi = paper.meta[j][0]
+        para_tokens[pi] += 1
+        para_cov[pi] += union[j]
+    sections = []
+    for title, p0, p1 in split_sections(paper):
+        tot = sum(para_tokens[p0:p1 + 1])
+        cov = sum(para_cov[p0:p1 + 1])
+        if tot >= 5:
+            sections.append({"title": title, "covered": cov, "total": tot,
+                             "ratio": round(cov / tot, 4)})
+    sections.sort(key=lambda s: -s["ratio"])
+
+    metrics = {
+        "total_ratio": round(overall, 4),                       # 总文字复制比(含引用/文献列表)
+        "copy_ratio": round(copy_chars / n, 4) if n else 0.0,   # 去除引用文献后复制比(主指标)
+        "cited_ratio": round(cited_chars / n, 4) if n else 0.0,  # 引用率
+        "cited_chars": cited_chars,
+        "bib_chars": bib_chars,
+    }
+
     return {"k": k, "min_run": min_run, "per_ref": per_ref, "union": union,
             "union_count": union_count, "overall": overall,
-            "runs_info": runs_info, "counts": counts}
+            "runs_info": runs_info, "counts": counts,
+            "metrics": metrics, "sections": sections}
 
 
 # ---------------------------------------------------------------- 报告
@@ -342,7 +457,7 @@ LIMIT_NOTE = (
 
 
 def md_report(paper, per_ref, k, min_run, overall, union_count, runs_info,
-              counts, now, max_runs) -> str:
+              counts, now, max_runs, metrics=None, sections=None) -> str:
     n = len(paper.tokens)
     total_ref_tokens = sum(len(pr["doc"].tokens) for pr in per_ref)
     L: list[str] = []
@@ -357,8 +472,26 @@ def md_report(paper, per_ref, k, min_run, overall, union_count, runs_info,
     L.append("")
     L.append("## 总体结论")
     L.append("")
-    L.append(f"**总重复率:{overall:.1%} —— {band(overall)}**")
+    L.append(f"**总文字复制比:{overall:.1%} —— {band(overall)}**")
     L.append("")
+    m = metrics
+    L.append(f"- **去除引用文献后复制比:{m['copy_ratio']:.1%}**(主指标,已剔除引用与文献列表)")
+    L.append(f"- 其中引用部分:{m['cited_ratio']:.1%}({m['cited_chars']:,} 词元,已标注引文标记或引号包裹)"
+             f";文献列表:{m['bib_chars']:,} 词元")
+    if runs_info:
+        kinds = {}
+        for r in runs_info:
+            kinds[r["kind"]] = kinds.get(r["kind"], 0) + 1
+        L.append("- 片段构成:" + "、".join(f"{k} {v} 处" for k, v in kinds.items()))
+    L.append("")
+    if sections:
+        L.append("**分章节复制比**(按标题行划分,降序):")
+        L.append("")
+        L.append("| 章节 | 复制比 | 覆盖/词元 |")
+        L.append("|---|---|---|")
+        for s in sections[:12]:
+            L.append(f"| {s['title'][:24]} | {s['ratio']:.1%} | {s['covered']}/{s['total']} |")
+        L.append("")
     L.append(f"论文 {n:,} 个词元中有 {union_count:,} 个出现在至少一篇参考文献中(各来源取并集)。")
     L.append("")
     L.append("> 本报告只反映论文与**上述所提供参考文献**的文字重合度,"
@@ -378,7 +511,8 @@ def md_report(paper, per_ref, k, min_run, overall, union_count, runs_info,
     shown = runs_info[:max_runs]
     for i, r in enumerate(shown, 1):
         L.append("")
-        L.append(f"### {i}. 长度 {r['tokens']} 词元 · 论文第 "
+        kind_tag = {"引用": "〔合理引用〕", "文献列表": "〔文献列表〕", "疑似抄袭": "〔疑似抄袭〕"}.get(r.get("kind", ""), "")
+        L.append(f"### {i}. {kind_tag}长度 {r['tokens']} 词元 · 论文第 "
                  f"{', '.join(map(str, r['paras']))} 段 · 来源:{'、'.join(r['sources'])}")
         L.append("")
         L.append(f"- **论文**:{r['paper_excerpt_md']}")
@@ -586,21 +720,24 @@ def main(argv=None) -> None:
     if args.out:
         write_out(args.out, md_report(paper, res["per_ref"], res["k"], res["min_run"],
                                       res["overall"], res["union_count"], runs_info,
-                                      counts, now, args.max_runs))
+                                      counts, now, args.max_runs,
+                                      metrics=res.get("metrics"), sections=res.get("sections")))
     if args.html_out:
         write_out(args.html_out, html_report(paper, res["per_ref"], res["k"],
                                              res["overall"], res["union_count"],
                                              res["union"], counts, now))
     if args.json_out:
         payload = {
-            "tool": "paper-plagiarism-check v1.0",
+            "tool": "paper-plagiarism-check v2.0",
             "generated_at": now,
             "k": res["k"], "min_run": res["min_run"],
             "paper": {"file": str(paper_path), "name": paper.name,
-                      "tokens": len(paper.tokens), "chars": paper.char_count,
+                      "tokens": n, "chars": paper.char_count,
                       "paras": len(paper.paras)},
             "overall_ratio": round(res["overall"], 4),
             "overall_band": band(res["overall"]),
+            "metrics": res.get("metrics"),
+            "sections": res.get("sections"),
             "references": [
                 {"name": pr["doc"].name, "tokens": len(pr["doc"].tokens),
                  "ratio": round(pr["ratio"], 4), "runs": counts[i]}
@@ -608,6 +745,7 @@ def main(argv=None) -> None:
             "runs": [
                 {"start_token": r["a"], "end_token": r["b"],
                  "tokens": r["tokens"], "paras": r["paras"],
+                 "kind": r.get("kind", ""),
                  "sources": r["sources"],
                  "paper_text": r["paper_excerpt"],
                  "reference_text": r["ref_excerpt"]}
