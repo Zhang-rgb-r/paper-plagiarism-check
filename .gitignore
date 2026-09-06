@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.log
+查重报告*.html
+查重报告*.md
+查重结果*.json
+AIGC疑似度报告*.html
+.DS_Store
+
