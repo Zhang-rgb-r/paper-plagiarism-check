@@ -103,8 +103,8 @@ def read_pdf(stream, name: str) -> list[str]:
         try:
             import pdfplumber
         except ImportError:
-            raise SystemExit(
-                "ERROR: 读取 PDF 需要 pypdf 或 pdfplumber(可先 `pip install pypdf`),"
+            raise ValueError(
+                "读取 PDF 需要 pypdf 或 pdfplumber(可先 `pip install pypdf`),"
                 f"或将 {name} 另存为 .docx / .txt。")
         with pdfplumber.open(stream) as pdf:
             text = "\n".join((pg.extract_text() or "") for pg in pdf.pages)
