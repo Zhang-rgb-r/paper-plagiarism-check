@@ -17,6 +17,7 @@ import datetime as _dt
 import html
 import json
 import re
+import socket
 import sys
 import threading
 import urllib.parse
@@ -878,7 +879,19 @@ def main(argv=None) -> None:
     args = ap.parse_args(argv)
 
     url = f"http://{args.host}:{args.port}/"
-    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    # 先探测端口:Windows 上 SO_REUSEADDR 会让第二个实例静默绑定同一端口,须显式检查
+    probe = socket.socket()
+    probe.settimeout(0.5)
+    if probe.connect_ex((args.host if args.host != "0.0.0.0" else "127.0.0.1", args.port)) == 0:
+        probe.close()
+        sys.exit(f"ERROR: 端口 {args.port} 已有查重服务在运行。"
+                 f"直接访问 http://127.0.0.1:{args.port}/ 即可,或换一个端口:--port 8766")
+    probe.close()
+    try:
+        server = ThreadingHTTPServer((args.host, args.port), Handler)
+    except OSError:
+        sys.exit(f"ERROR: 端口 {args.port} 已被占用(可能已有一个查重服务在运行)。"
+                 f"直接访问 http://127.0.0.1:{args.port}/,或换一个端口:--port 8766")
     print("=" * 52)
     print("📄 论文查重网页版已启动(本地运行)")
     print(f"   地址:{url}")
