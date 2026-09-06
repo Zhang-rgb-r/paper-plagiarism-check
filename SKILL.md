@@ -4,11 +4,20 @@ license: MIT
 description: 论文/文档查重的本地检测工具。将一篇论文(docx/pdf/txt/md)与用户提供的参考文献、往稿或语料库比对,输出总重复率、分来源重合度和每一处重复片段(含段落定位与双方原文对照)。Use whenever the user mentions 论文查重, 查重, 重复率, plagiarism check, duplicate check, similarity between documents, self-plagiarism, 文本重合, or asks to check whether a paper copies from given references — even if they just hand over a paper and a reference folder without saying 查重. Also handles AIGC 疑似度分析 and 在线自动检索 via bundled scripts.
 ---
 
-# Paper Plagiarism Check(论文查重)
+# Paper Plagiarism Check(论文查重)v2.0
 
 > 本技能遵循 Agent Skills 开放规范,兼容 ZCode、Claude Code 及其他支持 SKILL.md 的 AI 编程工具。脚本为纯 Python 标准库,可独立运行。
 
+v2.0 知网式功能:引用识别、文献列表归类、三大指标(总文字复制比 / **去除引用文献后复制比** / 引用率)、分章节复制比、arXiv 学术源、模糊匹配(轻度改写检测,单独列出需人工确认)。
+
 本地词元比对:把论文与参考文献都归一化成词元序列(中文逐字、英文按词,忽略大小写/全半角/空白/标点),凡与某篇参考文献存在 **k 个连续相同词元**(默认中文 13、英文 6,即常见的"连续 13 字判重"思路)即计为重复,合并为最大片段后生成报告。全程本地运行,文本不出本机。
+
+## 知网式指标说明(必须如实告知用户)
+
+- 报告给出三个数字:**总文字复制比**(含引用与文献列表)、**去除引用文献后复制比**(主指标,自动剔除标注了 `[n]` 引文标记、引号包裹的合理引用及文末参考文献列表)、**引用率**。口径对齐知网报告结构。
+- **分章节复制比**按论文标题行(第X章 / 1. / 1.1 / 摘要等)划分,逐章给出复制比。
+- **在线渠道含模糊匹配**:候选文献摘要与论文句子做 3-gram 相似度(≥35% 判为疑似改写),单独列出、不计入复制比,必须提示用户人工确认;能抓轻度改写,深层语义改写仍检不出。
+- **准确率无法等同知网**:知网的检测能力来自其独家亿级文献库与授权全文;本工具只能访问开放数据源(OpenAlex/Europe PMC/arXiv/搜索引擎)。应表述为"检测维度对齐知网,数据库覆盖不同",绝不承诺相同准确率。
 
 ## 先说清楚能力边界(必须告知用户)
 
