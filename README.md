@@ -16,6 +16,8 @@
 
 ## 🚀 快速开始
 
+**环境要求**:Python 3.8+(仅标准库;.pdf 支持需额外 `pip install pypdf`)。没有 Python 的话,先去 [python.org](https://www.python.org/downloads/) 安装。
+
 ```bash
 # 可选:如需读取 PDF 文献,安装 pypdf(.docx/.txt/.md 无需任何依赖)
 pip install pypdf
@@ -33,9 +35,14 @@ python scripts/check_plagiarism.py --paper 论文.docx --refs 文献目录/ 旧�
     --out 查重报告.md --html 查重报告.html --json 查重结果.json
 ```
 
-### 作为 ZCode 技能安装
+### 安装为 ZCode 技能
 
-把整个文件夹放到 `~/.agents/skills/paper-plagiarism-check/`,ZCode 即可在对话中自动触发查重流程。
+1. 点本页 **Code → Download ZIP**(或 `git clone` 本仓库)
+2. 解压。⚠️ **注意**:Download ZIP 解压出来的文件夹名是 `paper-plagiarism-check-main`,**必须重命名为 `paper-plagiarism-check`**(技能名与文件夹名一致才能被发现;git clone 的无需改名)
+3. 把文件夹放入以下任一位置:
+   - 个人级:`~/.agents/skills/paper-plagiarism-check/`(Windows 即 `C:\Users\你的用户名\.agents\skills\`)
+   - 项目级:`<你的项目>/.zcode/skills/paper-plagiarism-check/`
+4. **新开一个 ZCode 会话**,直接说"帮我给这篇论文查重"即可自动触发
 
 ## 🔍 检测原理
 
