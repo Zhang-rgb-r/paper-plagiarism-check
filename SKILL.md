@@ -1,9 +1,12 @@
 ---
 name: paper-plagiarism-check
-description: 论文/文档查重的本地检测工具。将一篇论文(docx/pdf/txt/md)与用户提供的参考文献、往稿或语料库比对,输出总重复率、分来源重合度和每一处重复片段(含段落定位与双方原文对照)。Use whenever the user mentions 论文查重, 查重, 重复率, plagiarism check, duplicate check, similarity between documents, self-plagiarism, 文本重合, or asks to check whether a paper copies from given references — even if they just hand over a paper and a reference folder without saying 查重.
+license: MIT
+description: 论文/文档查重的本地检测工具。将一篇论文(docx/pdf/txt/md)与用户提供的参考文献、往稿或语料库比对,输出总重复率、分来源重合度和每一处重复片段(含段落定位与双方原文对照)。Use whenever the user mentions 论文查重, 查重, 重复率, plagiarism check, duplicate check, similarity between documents, self-plagiarism, 文本重合, or asks to check whether a paper copies from given references — even if they just hand over a paper and a reference folder without saying 查重. Also handles AIGC 疑似度分析 and 在线自动检索 via bundled scripts.
 ---
 
 # Paper Plagiarism Check(论文查重)
+
+> 本技能遵循 Agent Skills 开放规范,兼容 ZCode、Claude Code 及其他支持 SKILL.md 的 AI 编程工具。脚本为纯 Python 标准库,可独立运行。
 
 本地词元比对:把论文与参考文献都归一化成词元序列(中文逐字、英文按词,忽略大小写/全半角/空白/标点),凡与某篇参考文献存在 **k 个连续相同词元**(默认中文 13、英文 6,即常见的"连续 13 字判重"思路)即计为重复,合并为最大片段后生成报告。全程本地运行,文本不出本机。
 
