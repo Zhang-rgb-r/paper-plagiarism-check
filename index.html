@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>论文查重 · 在线演示版</title>
+<style>
+:root{--bg:#f5f7fa;--card:#fff;--line:#e5e9f0;--ink:#1f2430;--sub:#6b7280;--accent:#2563eb;--ok:#16a34a;--mid:#d97706;--high:#dc2626}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7}
+.wrap{max-width:880px;margin:0 auto;padding:28px 16px 60px}
+header h1{margin:0;font-size:1.6em}
+header .sub{margin:4px 0 0;color:var(--sub)}
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.tab{flex:1;text-align:center;padding:10px;border:1px solid var(--line);background:var(--card);border-radius:10px;cursor:pointer;color:var(--sub);font-weight:600;min-width:150px}
+.tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.pane{display:none}.pane.on{display:block}
+.zone{background:var(--card);border:2px dashed #c9d2e0;border-radius:12px;padding:18px;text-align:center;cursor:pointer;transition:.15s;min-height:130px;margin-top:14px}
+.zone.drag{border-color:var(--accent);background:#eff6ff}
+.zone h3{margin:0 0 4px;font-size:1.02em}
+.zone .hint{color:var(--sub);font-size:.88em}
+.chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#eef2f8;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:.85em;max-width:100%}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip button{border:0;background:none;color:var(--sub);cursor:pointer;font-size:1em;padding:0}
+.chip button:hover{color:var(--high)}
+.opts{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 16px}
+.opts summary{cursor:pointer;color:var(--sub)}
+.opts label{display:inline-flex;align-items:center;gap:8px;margin:8px 18px 4px 0}
+.opts input{width:110px;padding:4px 8px;border:1px solid var(--line);border-radius:6px}
+.srces{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
+.srces label{display:inline-flex;align-items:center;gap:6px;margin:4px 18px 4px 0;cursor:pointer}
+.actions{margin-top:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:10px 26px;font-size:1.05em;cursor:pointer}
+.btn:disabled{background:#a8b8d8;cursor:not-allowed}
+#statusO,#statusA,#statusL{color:var(--sub)}
+#statusO.err,#statusA.err,#statusL.err{color:var(--high)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-top:18px}
+.card h3{margin:0 0 10px;font-size:1.05em}
+.verdict{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.verdict .pct{font-size:2.4em;font-weight:700;line-height:1.2}
+.pct.ok{color:var(--ok)}.pct.mid{color:var(--mid)}.pct.high{color:var(--high)}
+.badge{padding:2px 14px;border-radius:999px;color:#fff}
+.badge.ok{background:var(--ok)}.badge.mid{background:var(--mid)}.badge.high{background:var(--high)}
+.meta2{color:var(--sub);font-size:.9em;margin-top:6px}
+table{border-collapse:collapse;width:100%;margin-top:6px}
+th,td{border-bottom:1px solid var(--line);padding:6px 10px;text-align:left;font-size:.95em}
+mark{background:#ffd54f;padding:0 2px;border-radius:2px}
+.run{border-left:3px solid #ffd54f;padding:8px 14px;margin:12px 0;background:#fffdf2;border-radius:0 8px 8px 0}
+.run .meta{color:var(--sub);font-size:.85em;margin-bottom:4px}
+.run .lbl{font-weight:600;margin-right:6px}
+.run .src{margin-top:6px;font-size:.92em;word-break:break-all}
+.run .src a{color:var(--accent)}
+.run .quote{background:#f6f8fa;border-radius:6px;padding:6px 10px;margin-top:4px;font-size:.88em;color:#374151}
+.warn{background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:6px 12px;margin-top:8px;font-size:.9em}
+.fulltext p{margin:10px 0}
+.dl button{background:#fff;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:6px 16px;cursor:pointer}
+footer{margin-top:30px;color:var(--sub);font-size:.85em;text-align:center}
+.empty{color:var(--sub)}
+span.aigc-high{background:#ffb3a7;padding:0 2px;border-radius:3px}
+span.aigc-mid{background:#ffe082;padding:0 2px;border-radius:3px}
+.demo-note{background:#e0f2fe;border:1px solid #bae6fd;border-radius:10px;padding:10px 16px;margin-top:14px;font-size:.9em;color:#075985}
+.demo-note a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+ <h1>📄 论文查重 <span style="font-size:.55em;color:var(--sub)">浏览器演示版</span></h1>
+ <p class="sub">全部计算在浏览器内完成,文件不会上传到任何服务器</p>
+</header>
+
+<div class="tabs">
+ <div class="tab on" id="tbL">📁 与本地文献比对</div>
+ <div class="tab" id="tbA">🔍 AIGC 疑似分析</div>
+ <div class="tab" id="tbO">🌐 在线检索 · 学术库</div>
+</div>
+
+<div class="demo-note">这是 <a href="https://github.com/Zhang-rgb-r/paper-plagiarism-check" target="_blank" rel="noreferrer">paper-plagiarism-check</a> 的纯浏览器演示版:本地比对与 AIGC 分析功能完整;在线检索仅支持 OpenAlex / Europe PMC 学术源,搜索引擎渠道与 PDF 支持请下载仓库用本地版(<code>start_web.bat</code> / <code>start_web.sh</code>)。</div>
+
+<div class="pane on" id="pnL">
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px" id="lzGrid">
+  <div class="zone" id="zoneLP" style="margin-top:14px">
+   <input type="file" id="fileLP" accept=".txt,.md,.docx" hidden>
+   <h3>① 待检论文</h3><div class="hint">.txt / .md / .docx(PDF 请用本地版)</div>
+   <div class="chips" id="chLP"></div>
+  </div>
+  <div class="zone" id="zoneLR" style="margin-top:14px">
+   <input type="file" id="fileLR" multiple accept=".txt,.md,.docx" hidden>
+   <h3>② 参考文献(可多个)</h3><div class="hint">引文原文 / 往稿 / 语料</div>
+   <div class="chips" id="chLR"></div>
+  </div>
+ </div>
+ <details class="opts"><summary>高级选项</summary>
+  <label>判定窗口 k<input type="number" id="kIn" min="2" max="60" placeholder="自动:中文 13 / 英文 6"></label>
+ </details>
+ <div class="actions"><button class="btn" id="goL" disabled>开始比对</button><span id="statusL">请先选择论文与参考文献</span></div>
+ <div id="warnL"></div>
+ <section id="resL" hidden></section>
+</div>
+
+<div class="pane" id="pnA">
+ <div class="zone" id="zoneA">
+  <input type="file" id="fileA" accept=".txt,.md,.docx" hidden>
+  <h3>① 拖入待分析的论文</h3><div class="hint">离线统计,秒级完成 · 估计"AI 生成风格疑似度"</div>
+  <div class="chips" id="chA"></div>
+ </div>
+ <div class="actions"><button class="btn" id="goA" disabled>开始分析</button><span id="statusA">请先拖入论文</span></div>
+ <div id="warnA"></div>
+ <section id="resA" hidden></section>
+</div>
+
+<div class="pane" id="pnO">
+ <div class="zone" id="zoneO">
+  <input type="file" id="fileO" accept=".txt,.md,.docx" hidden>
+  <h3>① 拖入待检论文</h3><div class="hint">自动切句,到 OpenAlex / Europe PMC 检索原句出处</div>
+  <div class="chips" id="chO"></div>
+ </div>
+ <div class="srces">检索来源:
+  <label><input type="checkbox" class="ock" value="openalex" checked>OpenAlex 学术库</label>
+  <label><input type="checkbox" class="ock" value="europepmc" checked>Europe PMC 开放全文</label>
+ </div>
+ <div class="actions"><button class="btn" id="goO" disabled>开始检索</button><span id="statusO">请先拖入论文</span></div>
+ <div id="warnO"></div>
+ <section id="resO" hidden></section>
+</div>
+
+<footer>判定规则:整句(或较长小句)/ 连续 k 词元逐字重复(归一化后忽略大小写、全半角、空白与标点)。
+同义改写无法检出;开放数据源覆盖有限,AIGC 疑似度为启发式统计;结果不代表知网 / Turnitin 结论。</footer>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const ACCEPT = [".txt", ".md", ".docx"];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtSize = n => n < 1024 ? n + " B" : n < 1048576 ? (n/1024).toFixed(0) + " KB" : (n/1048576).toFixed(1) + " MB";
+
+/* ================= 文本抽取 ================= */
+const CJK_CLASS = "\\u3040-\\u30ff\\u31f0-\\u31ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uac00-\\ud7af";
+const TOKEN_RE = new RegExp("[" + CJK_CLASS + "]|[0-9A-Za-z\\u00c0-\\u024f\\u0370-\\u03ff\\u0400-\\u04ff_]+", "g");
+const CJK_ONE = new RegExp("^[" + CJK_CLASS + "]$");
+
+function decodeText(buf){
+  const b = new Uint8Array(buf);
+  if (b[0]===0xef && b[1]===0xbb && b[2]===0xbf) return new TextDecoder("utf-8").decode(b);
+  if (b[0]===0xff && b[1]===0xfe) return new TextDecoder("utf-16le").decode(b);
+  try { return new TextDecoder("utf-8", {fatal:true}).decode(b); }
+  catch(e){ try { return new TextDecoder("gb18030").decode(b); } catch(e2){ return new TextDecoder().decode(b); } }
+}
+
+async function readDocxParas(buf){
+  const bytes = new Uint8Array(buf);
+  const dv = new DataView(bytes.buffer);
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= 0; i--){ if (dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; } }
+  if (eocd < 0) throw new Error("不是有效的 .docx(ZIP)");
+  const count = dv.getUint16(eocd + 10, true), cdOff = dv.getUint32(eocd + 16, true);
+  const td = new TextDecoder();
+  let p = cdOff, target = null;
+  for (let i = 0; i < count; i++){
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true);
+    const csize = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true), elen = dv.getUint16(p + 30, true);
+    const name = td.decode(bytes.slice(p + 46, p + 46 + nlen));
+    if (name === "word/document.xml") target = { method, csize, lho: dv.getUint32(p + 42, true) };
+    p += 46 + nlen + elen + dv.getUint32(p + 20, true) + dv.getUint32(p + 24, true);
+  }
+  if (!target) throw new Error("docx 中缺少 word/document.xml");
+  const lnlen = dv.getUint16(target.lho + 26, true), lelen = dv.getUint16(target.lho + 28, true);
+  const dataStart = target.lho + 30 + lnlen + lelen;
+  const comp = bytes.slice(dataStart, dataStart + target.csize);
+  let xmlBytes;
+  if (target.method === 0) xmlBytes = comp;
+  else if (target.method === 8){
+    const ds = new DecompressionStream("deflate-raw");
+    const stream = new Blob([comp]).stream().pipeThrough(ds);
+    xmlBytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  } else throw new Error("不支持的 docx 压缩方式");
+  const xml = td.decode(xmlBytes);
+  const doc = new DOMParser().parseFromString(xml, "text/xml");
+  const paras = [];
+  for (const pe of doc.getElementsByTagName("w:p")){
+    let t = "";
+    for (const te of pe.getElementsByTagName("w:t")) t += te.textContent || "";
+    if (t.trim()) paras.push(t.trim());
+  }
+  if (!paras.length) throw new Error("docx 中未提取到文本");
+  return paras;
+}
+
+function tokenizeParas(paras){
+  const tokens = [], meta = [];
+  paras.forEach((para, pi) => {
+    let m; TOKEN_RE.lastIndex = 0;
+    while ((m = TOKEN_RE.exec(para))){
+      const t = m[0].normalize("NFKC").toLowerCase();
+      if (t){ tokens.push(t); meta.push([pi, m.index, m.index + m[0].length]); }
+    }
+  });
+  return { tokens, meta };
+}
+
+async function loadDoc(file){
+  const name = file.name;
+  const lower = name.toLowerCase();
+  let paras;
+  if (lower.endsWith(".docx")) paras = await readDocxParas(await file.arrayBuffer());
+  else {
+    const text = decodeText(await file.arrayBuffer());
+    paras = text.split(/\r\n|\r|\n/).map(s => s.trim()).filter(Boolean);
+  }
+  const tokens = [], meta = [];
+  paras.forEach((para, pi) => {
+    let m; TOKEN_RE.lastIndex = 0;
+    while ((m = TOKEN_RE.exec(para))){
+      const t = m[0].normalize("NFKC").toLowerCase();
+      if (t){ tokens.push(t); meta.push([pi, m.index, m.index + m[0].length]); }
+    }
+  });
+  return { name, paras, tokens, meta, chars: paras.join("").length };
+}
+
+/* ================= 本地比对 ================= */
+function autoK(sample){
+  if (!sample.length) return 13;
+  const cjk = sample.filter(t => CJK_ONE.test(t)).length;
+  return cjk / sample.length >= 0.30 ? 13 : 6;
+}
+function buildIndex(tokens, k){
+  const idx = new Map();
+  for (let i = 0; i + k <= tokens.length; i++){
+    const key = tokens.slice(i, i + k).join("\u0000");
+    if (!idx.has(key)) idx.set(key, i);
+  }
+  return idx;
+}
+function excerptHtml(doc, a, b, ctx, bold){
+  const n = doc.meta.length;
+  if (!n) return "";
+  a = Math.max(0, a); b = Math.min(b, n - 1);
+  const pieces = [];
+  let i = a;
+  while (i <= b){
+    const pi = doc.meta[i][0];
+    let j = i;
+    while (j < b && doc.meta[j + 1][0] === pi) j++;
+    let lo = i, hi = j, t = 0;
+    while (lo - 1 >= 0 && t < ctx && doc.meta[lo - 1][0] === pi){ lo--; t++; }
+    t = 0;
+    while (hi + 1 < n && t < ctx && doc.meta[hi + 1][0] === pi){ hi++; t++; }
+    const s = doc.meta[i][1], e = doc.meta[j][2];
+    const cs = doc.meta[lo][1], ce = doc.meta[hi][2];
+    const text = doc.paras[pi];
+    let mid = text.slice(s, e);
+    if (mid.length > 220) mid = mid.slice(0, 110) + "……(中段略,共 " + mid.length + " 字)……" + mid.slice(-70);
+    let body = esc(text.slice(cs, s)) + (bold ? "<b>" + esc(mid) + "</b>" : esc(mid)) + esc(text.slice(e, ce));
+    if (cs > 0) body = "……" + body;
+    if (ce < text.length) body += "……";
+    pieces.push(body);
+    i = j + 1;
+  }
+  return pieces.join(" ¶ ");
+}
+function renderParas(doc, covered){
+  const spans = {};
+  let cur = null;
+  for (let j = 0; j < doc.tokens.length; j++){
+    if (!covered[j]) continue;
+    const pi = doc.meta[j][0], s = doc.meta[j][1], e = doc.meta[j][2];
+    if (cur && pi === cur[0] && s <= cur[2]) cur = [pi, cur[1], Math.max(cur[2], e)];
+    else { if (cur) (spans[cur[0]] = spans[cur[0]] || []).push([cur[1], cur[2]]); cur = [pi, s, e]; }
+  }
+  if (cur) (spans[cur[0]] = spans[cur[0]] || []).push([cur[1], cur[2]]);
+  const out = [];
+  for (let pi = 0; pi < doc.paras.length; pi++){
+    const parts = []; let pos = 0;
+    for (const [s, e] of (spans[pi] || [])){
+      if (s > pos) parts.push(esc(doc.paras[pi].slice(pos, s)));
+      parts.push("<mark>" + esc(doc.paras[pi].slice(s, e)) + "</mark>");
+      pos = Math.max(pos, e);
+    }
+    parts.push(esc(doc.paras[pi].slice(pos)));
+    out.push('<p class="doc">【第 ' + (pi + 1) + ' 段】' + parts.join("") + "</p>");
+  }
+  return out;
+}
+function localAnalyze(paper, refs, k, minRun){
+  const n = paper.tokens.length;
+  if (k <= 0) k = autoK(paper.tokens.concat(...refs.map(r => r.tokens.slice(0, 2000))));
+  if (minRun <= 0) minRun = k;
+  const grams = [];
+  for (let i = 0; i + k <= n; i++) grams.push(paper.tokens.slice(i, i + k).join("\u0000"));
+  const per = refs.map(d => {
+    const index = buildIndex(d.tokens, k);
+    const cov = new Uint8Array(n), rpos = new Int32Array(n).fill(-1);
+    for (let i = 0; i < grams.length; i++){
+      const p0 = index.get(grams[i]);
+      if (p0 !== undefined) for (let j = i; j < i + k; j++) if (!cov[j]){ cov[j] = 1; rpos[j] = p0 + (j - i); }
+    }
+    let c = 0; for (let i = 0; i < n; i++) c += cov[i];
+    return { doc: d, cov, rpos, ratio: n ? c / n : 0 };
+  });
+  const union = new Uint8Array(n);
+  for (const pr of per) for (let i = 0; i < n; i++) if (pr.cov[i]) union[i] = 1;
+  let unionCount = 0; for (let i = 0; i < n; i++) unionCount += union[i];
+  const overall = n ? unionCount / n : 0;
+  const runs = [];
+  let start = null;
+  for (let i = 0; i <= n; i++){
+    const c = i < n ? union[i] : 0;
+    if (c && start === null) start = i;
+    else if (!c && start !== null){ if (i - start >= minRun) runs.push([start, i - 1]); start = null; }
+  }
+  const runsInfo = [];
+  for (const [a, b] of runs){
+    const len = b - a + 1;
+    const scored = per.map((pr, idx) => ({ o: pr.cov.slice(a, b + 1).reduce((x, y) => x + y, 0), idx }))
+      .filter(x => x.o >= 0.4 * len).sort((x, y) => y.o - x.o);
+    const chosen = scored.length ? scored.slice(0, 3) : scored.slice(0, 1);
+    const sources = chosen.map(x => per[x.idx].doc.name);
+    const paras = [...new Set(paper.meta.slice(a, b + 1).map(m => m[0] + 1))];
+    const paperHtml = excerptHtml(paper, a, b, 6, true);
+    const primary = chosen[0] ? chosen[0].idx : 0;
+    let j0 = a; while (j0 <= b && !per[primary].cov[j0]) j0++;
+    const rstart = per[primary].rpos[j0];
+    const rd = per[primary].doc;
+    const refHtml = (rstart >= 0 && rstart + len - 1 < rd.tokens.length)
+      ? excerptHtml(rd, rstart, rstart + len - 1, 6, false) : "";
+    runsInfo.push({ a, b, tokens: len, paras, sources, sourceIdx: chosen.map(x => x.idx), paperHtml, refHtml });
+  }
+  runsInfo.sort((x, y) => y.tokens - x.tokens);
+  const counts = per.map((_, i) => runsInfo.filter(r => r.sourceIdx.includes(i)).length);
+  return { k, minRun, per, union, unionCount, overall, runsInfo, counts };
+}
+
+/* ================= AIGC ================= */
+const AI_FRAMES = [
+  [/(随着)[^。]{2,14}的(快速|不断|迅速|日益)?(发展|进步|普及|提升|增长)/, 1.0, "随着…的快速发展"],
+  [/(值得注意的是|需要指出的是|值得一提的是)/, 1.0, "值得注意的是"],
+  [/(综上所述|总而言之|总的来说|总体而言|由此可见|不难发现)/, 1.0, "综上所述类总结"],
+  [/首先[^。]{2,40}其次[^。]{2,40}(再次|最后|此外)/, 1.2, "首先…其次…最后"],
+  [/一方面[^。]{2,40}另一方面/, 1.0, "一方面…另一方面"],
+  [/为[^。]{2,10}提供了[^。]{2,10}(支持|保障|基础|参考|依据|思路)/, 0.8, "为…提供了…"],
+  [/具有[^。]{2,8}(重要|深远|重大|积极)的?(意义|价值|影响|作用)/, 0.8, "具有重要…意义"],
+  [/(取得|获得|带来)[^。]{2,8}显著(提升|成效|效果|进展)/, 0.8, "取得显著提升"],
+  [/(众所周知|毋庸置疑|不言而喻)/, 0.8, "众所周知类"],
+  [/((日益|越来越))[^。,，]{0,8}(增长|普及|重要|突出)/, 0.5, "日益…"],
+  [/((全面|深入|进一步))(推进|提升|加强|完善|探讨|分析|研究)/, 0.5, "全面/深入推进"],
+  [/(赋能|抓手|闭环|底层逻辑|顶层设计|多维度|全方位|多层次)/, 0.7, "流行语"],
+  [/(换言之|换句话说|简而言之|具体而言)/, 0.5, "换言之类"],
+  [/it is (important|worth|crucial) (to note|noting|to highlight)/i, 1.2, "it is important to note"],
+  [/with the rapid development of/i, 1.2, "with the rapid development of"],
+  [/in (recent years|today's|the modern era)/i, 0.6, "in recent years"],
+  [/plays? a (crucial|vital|pivotal|important|significant) role/i, 1.0, "plays a crucial role"],
+  [/(moreover|furthermore|additionally|in conclusion|overall)/i, 0.5, "moreover 类连接词"],
+  [/(delve(s|d)? into|shed light on|pave the way for|a wide (range|array) of)/i, 0.9, "delve into 类"],
+  [/(leverage|utilize|harness|comprehensive|holistic|robust|seamless(ly)?|pivotal)/i, 0.4, "AI 高频词"]
+];
+const CONN_START = /^(然而|但|但是|此外|另外|同时|因此|所以|于是|首先|其次|再次|最后|总之|综上|由此|具体来说|具体而言|一般而言|通常|目前|当前|近年来|在此基础上|与此同时|however|moreover|furthermore|additionally|therefore|thus|overall|hence|in addition|firstly|secondly|finally)/i;
+const VAGUE = ["一定程度上","某种程度","在一定条件下","一些","某些","许多","大量","各种","多种多样","通常","一般而言","一般来说","大致","大体","相对","较为","比较","更加","日益","广泛","深入","普遍","往往","几乎","相当","非常","极其","十分","various","numerous","significant","considerably","relatively","generally","typically","increasingly","extremely","highly","widely","deeply"];
+const NUM_RE = /[0-9０-９]/;
+const SENT_SPLIT = /(?<=[。!?！?;;])\s*|(?<=[.!?])(?:\s+|$)/;
+
+function splitSentences(paras, minChars){
+  const out = [];
+  paras.forEach((para, pi) => {
+    let idx = 0;
+    for (const piece of para.split(SENT_SPLIT)){
+      if (!piece) continue;
+      const start = para.indexOf(piece, idx);
+      idx = start + piece.length;
+      const nkey = piece.normalize("NFKC").toLowerCase().replace(/[^0-9a-z\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/g, "");
+      if (nkey.length < minChars) continue;
+      out.push({ text: piece.trim(), para: pi + 1, start, end: start + piece.length, nkey });
+    }
+  });
+  return out;
+}
+function aigcScore(sent){
+  const flags = []; let raw = 0;
+  for (const [re, w, label] of AI_FRAMES) if (re.test(sent)){ flags.push(label); raw += w; }
+  const m = sent.trim().match(CONN_START);
+  if (m){ flags.push("连接词开头(" + m[1] + ")"); raw += 0.35; }
+  let vague = 0; for (const w of VAGUE) vague += sent.split(w).length - 1;
+  if (vague){ flags.push("模糊词×" + vague); raw += Math.min(0.6, vague * 0.12); }
+  const n = sent.normalize("NFKC").toLowerCase().replace(/[^0-9a-z\u4e00-\u9fff]/g, "").length;
+  if (!NUM_RE.test(sent) && n > 30) raw += 0.12;
+  if (n >= 15 && n <= 50) raw += 0.08;
+  return { score: Math.min(100, raw / 2.2 * 100), flags };
+}
+function aigcAnalyze(doc){
+  const sents = splitSentences(doc.paras, 8).map(s => ({ ...s, ...aigcScore(s.text) }));
+  if (!sents.length) return null;
+  const lens = sents.map(s => s.nkey.length);
+  const mean = lens.reduce((a, b) => a + b, 0) / lens.length;
+  const cv = Math.sqrt(lens.reduce((a, b) => a + (b - mean) ** 2, 0) / lens.length) / (mean || 1);
+  const burst = Math.max(0, Math.min(1, (0.55 - cv) / 0.35));
+  const textAll = doc.paras.join("\n");
+  const kchars = Math.max(1, textAll.length / 1000);
+  const frames = [];
+  for (const [re, w, label] of AI_FRAMES){
+    let m; re.lastIndex = 0;
+    while ((m = re.exec(textAll))){
+      let pi = 0;
+      while (pi < doc.paras.length && !doc.paras[pi].includes(m[0]) && pi < doc.paras.length) pi++;
+      frames.push({ label, text: m[0].slice(0, 30), para: pi < doc.paras.length ? pi + 1 : null });
+      if (frames.length > 60) break;
+    }
+  }
+  const frameScore = Math.min(1, frames.length / kchars / 6);
+  const connRatio = sents.filter(s => s.flags.some(f => f.startsWith("连接词开头"))).length / sents.length;
+  const connScore = Math.min(1, connRatio / 0.45);
+  let vagueCount = 0; for (const w of VAGUE) vagueCount += textAll.split(w).length - 1;
+  const vagueScore = Math.min(1, vagueCount / kchars / 12);
+  const scores = sents.map(s => s.score).sort((a, b) => b - a);
+  const topN = Math.max(1, Math.floor(scores.length * 0.3));
+  const topMean = scores.slice(0, topN).reduce((a, b) => a + b, 0) / topN;
+  const score = Math.round(Math.max(0, Math.min(100,
+    0.40 * topMean + 22 * frameScore + 14 * burst + 10 * connScore + 9 * vagueScore)) * 10) / 10;
+  const spans = sents.filter(s => s.score >= 50).map(s => ({ ...s, level: s.score >= 75 ? "high" : "mid" }));
+  const perPara = {};
+  spans.forEach(s => (perPara[s.para - 1] = perPara[s.para - 1] || []).push(s));
+  const paragraphs = doc.paras.map((para, pi) => {
+    const parts = []; let pos = 0;
+    for (const sp of (perPara[pi] || []).sort((a, b) => a.start - b.start)){
+      if (sp.start > pos) parts.push(esc(para.slice(pos, sp.start)));
+      parts.push('<span class="' + (sp.level === "high" ? "aigc-high" : "aigc-mid") + '">' + esc(para.slice(sp.start, sp.end)) + "</span>");
+      pos = Math.max(pos, sp.end);
+    }
+    parts.push(esc(para.slice(pos)));
+    return '<p class="doc">【第 ' + (pi + 1) + ' 段】' + parts.join("") + "</p>";
+  });
+  return {
+    score, band: score >= 70 ? "高疑似" : score >= 45 ? "中等疑似" : "低疑似",
+    signals: [
+      { name: "句长均匀度(过均匀更可疑)", value: "变异系数 " + cv.toFixed(2), score: Math.round(burst * 100) },
+      { name: "模板短语密度", value: frames.length + " 处 / 千字", score: Math.round(frameScore * 100) },
+      { name: "连接词开头句占比", value: Math.round(connRatio * 100) + "%", score: Math.round(connScore * 100) },
+      { name: "模糊限定词密度", value: vagueCount + " 个 / 千字", score: Math.round(vagueScore * 100) }
+    ],
+    frames, sentences: sents.slice().sort((a, b) => b.score - a.score).slice(0, 30),
+    paragraphs, sentences_total: sents.length,
+    paper: { name: doc.name, tokens: doc.tokens.length, chars: doc.chars }
+  };
+}
+
+/* ================= 在线检索(OpenAlex / EuropePMC) ================= */
+const STOP = new Set(["the","and","for","with","that","this","from","are","was","were","have","has","had","not","but","our","can","which","into","such","their","than","also","these","those","its","based","using","results","show","conclusion","propose","proposed"]);
+const STOP_ZH = /^(的|了|和|是|在|与|及|对|将|把|被|为|以|通过|基于|其中|从而|进而|同时|此外|因此|首先|其次|最后|可以|能够|进行|采用|使用|提出|方法|研究|分析|结果|表明|实验|模型|系统|数据|本文|我们|他们|该|此|这些|一些|不同|主要|重要|显著|有效)$/;
+function keywords(sentence){
+  const latin = sentence.match(/[A-Za-z]{3,}/g) || [];
+  const cjkRuns = sentence.match(/[\u4e00-\u9fff]{2,}/g) || [];
+  const out = [];
+  if (cjkRuns.length) out.push(cjkRuns.join("").slice(0, 14));
+  out.push(...[...new Set(latin.filter(w => !STOP.has(w.toLowerCase())))].sort((a, b) => b.length - a.length).slice(0, 6));
+  return out;
+}
+const stripNorm = s => s.normalize("NFKC").toLowerCase().replace(/[^0-9a-z\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/g, "");
+function matchParts(nkey, sentence, hay, minLen){
+  if (hay.includes(nkey)) return { pn: nkey, ptext: sentence, len: nkey.length };
+  for (const part of sentence.split(/[,，、;;::]/)){
+    const pn = stripNorm(part);
+    if (pn.length >= minLen && hay.includes(pn)) return { pn, ptext: part.trim(), len: pn.length };
+  }
+  return null;
+}
+function rebuildAbstract(inv){
+  if (!inv) return "";
+  let maxI = 0;
+  for (const idxs of Object.values(inv)) for (const i of idxs) maxI = Math.max(maxI, i);
+  const arr = new Array(maxI + 1);
+  for (const [w, idxs] of Object.entries(inv)) for (const i of idxs) arr[i] = w;
+  return arr.join(" ").replace(/(?<=[\u4e00-\u9fff]) +(?=[\u4e00-\u9fff])/g, "");
+}
+async function checkOpenAlex(nkey, sentence){
+  const words = keywords(sentence);
+  if (!words.length) return [];
+  const url = "https://api.openalex.org/works?filter=title_and_abstract.search:" + encodeURIComponent(words.join(" ")) + "&per-page=25&mailto=local-plagiarism-check@example.com";
+  const data = await (await fetch(url)).json();
+  const hits = [];
+  for (const w of (data.results || [])){
+    const title = w.display_name || "(无题名)";
+    const ab = rebuildAbstract(w.abstract_inverted_index);
+    const hay = stripNorm(title) + "\u0000" + stripNorm(ab);
+    const m = matchParts(nkey, sentence, hay, 15);
+    if (m){
+      const raw = title + "。" + ab;
+      hits.push({ source: "openalex", source_label: "OpenAlex 学术库", title,
+        url: w.doi || w.id, meta: [w.publication_year, (w.primary_location || {}).source || {}].filter(Boolean).map((x, i) => typeof x === "object" ? x.display_name || "" : x).join(" / "),
+        matched_len: m.len, snippet: raw.slice(0, 200) });
+      if (hits.length >= 2) break;
+    }
+  }
+  return hits;
+}
+async function checkEuropePMC(nkey, sentence){
+  if ((sentence.match(/[A-Za-z]{2,}/g) || []).length < 4) return [];
+  const phrase = sentence.replace(/["\[\]{}]/g, " ").trim().slice(0, 110);  // 超长短语查询会失效,用前缀短语
+  const queries = [
+    "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=" + encodeURIComponent('"' + phrase + '"') + "&format=json&pageSize=5&resultType=core"
+  ];
+  // 兜底:关键词检索(短语查询对长句/连字符常失效)
+  const words = sentence.replace(/[^\w\s\u4e00-\u9fff]/g, " ").split(/\s+/).filter(w => w.length > 2 && !STOP.has(w.toLowerCase()));
+  if (words.length >= 4){
+    queries.push("https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=" + encodeURIComponent(words.slice(0, 8).join(" ")) + "&format=json&pageSize=10&resultType=core");
+  }
+  const hits = [];
+  for (const url of queries){
+    if (hits.length >= 2) break;
+    try {
+      const data = await (await fetch(url)).json();
+      for (const h of ((data.resultList || {}).result || []).slice(0, 6)){
+        const title = (h.title || "(无题名)").replace(/<[^>]+>/g, "");
+        const abstract = (h.abstractText || "").replace(/<[^>]+>/g, "");
+        const raw = title + "。" + abstract;
+        const hay = stripNorm(raw);
+        const m = matchParts(nkey, sentence, hay, 15);
+        if (!m) continue;
+        if (hits.some(x => x.url === (h.source || "MED") + "/" + (h.id || ""))) continue;
+        hits.push({ source: "europepmc", source_label: "Europe PMC 开放全文", title,
+          url: "https://europepmc.org/article/" + (h.source || "MED") + "/" + (h.id || ""),
+          meta: [h.journalTitle, h.pubYear, "摘要"].filter(Boolean).join(" / "),
+          matched_len: m.len, snippet: raw.slice(0, 200) });
+      }
+    } catch(e){}
+  }
+  return hits;
+}
+async function onlineAnalyze(doc, sources, onProgress){
+  const sents = splitSentences(doc.paras, 15);
+  const uniq = new Map();
+  for (const s of sents) if (!uniq.has(s.nkey)) uniq.set(s.nkey, s);
+  const items = [...uniq.values()];
+  const total = items.length;
+  const hitDetails = [];
+  let done = 0, matchedChars = 0, matchedSents = 0;
+  const srcCounts = {};
+  for (const s of items){
+    let hits = [];
+    try { if (sources.includes("openalex")) hits.push(...await checkOpenAlex(s.nkey, s.text)); } catch(e){}
+    try { if (sources.includes("europepmc")) hits.push(...await checkEuropePMC(s.nkey, s.text)); } catch(e){}
+    done++;
+    if (hits.length){
+      const best = Math.max(...hits.map(h => h.matched_len || 0));
+      const occs = sents.filter(x => x.nkey === s.nkey);
+      matchedChars += best * occs.length;
+      matchedSents += occs.length;
+      srcCounts[hits[0].source] = (srcCounts[hits[0].source] || 0) + 1;
+      hitDetails.push({ text: s.text, para: s.para, matched_len: best, sources: hits });
+    }
+    if (onProgress) onProgress(done, total, hitDetails.length, matchedChars);
+  }
+  const ratio = sents.length ? matchedChars / sents.reduce((a, s) => a + s.text.length, 0) : 0;
+  return { ratio, sentences_total: sents.length, sentences_matched: matchedSents,
+    matched_chars: matchedChars, source_counts: srcCounts, hit_details: hitDetails,
+    paper: { name: doc.name, tokens: doc.tokens.length, chars: doc.chars } };
+}
+
+/* ================= UI ================= */
+function makeZone(zoneId, inputId, chipsId, opts){
+  const api = { files: opts.multiple ? [] : null };
+  const chips = $(chipsId);
+  function render(){
+    if (opts.multiple){
+      chips.innerHTML = api.files.map((f, i) =>
+        '<span class="chip"><span>' + esc(f.name) + '(' + fmtSize(f.size) + ')</span><button data-i="' + i + '">✕</button></span>').join("");
+      chips.querySelectorAll("button").forEach(b => b.onclick = () => { api.files.splice(+b.dataset.i, 1); render(); opts.onChange(); });
+    } else {
+      chips.innerHTML = api.files ? '<span class="chip"><span>' + esc(api.files.name) + '(' + fmtSize(api.files.size) + ')</span><button>✕</button></span>' : "";
+      if (api.files) chips.querySelector("button").onclick = () => { api.files = null; render(); opts.onChange(); };
+    }
+    opts.onChange();
+  }
+  function setFiles(list){
+    const ok = list.filter(f => ACCEPT.includes("." + (f.name.split(".").pop() || "").toLowerCase()));
+    if (ok.length < list.length) setStatus(opts.statusId, "已忽略 " + (list.length - ok.length) + " 个格式不支持的文件(演示版支持 .txt/.md/.docx)", true);
+    if (opts.multiple){ for (const f of ok) if (!api.files.some(g => g.name === f.name && g.size === f.size)) api.files.push(f); }
+    else if (ok.length) api.files = ok[0];
+    render();
+  }
+  const input = $(inputId), zone = $(zoneId);
+  zone.addEventListener("click", e => { if (e.target.tagName !== "BUTTON") input.click(); });
+  input.addEventListener("change", () => { setFiles([...input.files]); input.value = ""; });
+  zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("drag"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("drag"));
+  zone.addEventListener("drop", async e => {
+    e.preventDefault(); zone.classList.remove("drag");
+    const dt = e.dataTransfer;
+    setFiles(dt.files && dt.files.length ? [...dt.files] : []);
+  });
+  return api;
+}
+function setStatus(id, msg, err){ const el = $(id); el.textContent = msg; el.classList.toggle("err", !!err); }
+function switchTab(which){
+  for (const [name, ids] of Object.entries(TABS)){
+    $(ids[0]).classList.toggle("on", name === which);
+    $(ids[1]).classList.toggle("on", name === which);
+  }
+}
+const TABS = { local: ["tbL", "pnL"], aigc: ["tbA", "pnA"], online: ["tbO", "pnO"] };
+$("tbL").onclick = () => switchTab("local");
+$("tbA").onclick = () => switchTab("aigc");
+$("tbO").onclick = () => switchTab("online");
+
+let lpFile = null, lrFiles = [], aFile = null, oFile = null;
+const zpL = makeZone("zoneLP", "fileLP", "chLP", { multiple: false, statusId: "statusL",
+  onChange: () => { lpFile = zpL.files; $("goL").disabled = !(lpFile && lrFiles.length); if (lpFile) setStatus("statusL", "已就绪,点击开始比对"); } });
+const zrL = makeZone("zoneLR", "fileLR", "chLR", { multiple: true, statusId: "statusL",
+  onChange: () => { lrFiles = zrL.files; $("goL").disabled = !(lpFile && lrFiles.length); if (lrFiles.length) setStatus("statusL", "已就绪,点击开始比对"); } });
+const zA = makeZone("zoneA", "fileA", "chA", { multiple: false, statusId: "statusA",
+  onChange: () => { aFile = zA.files; $("goA").disabled = !aFile; if (aFile) setStatus("statusA", "已就绪,点击开始分析"); } });
+const zO = makeZone("zoneO", "fileO", "chO", { multiple: false, statusId: "statusO",
+  onChange: () => { oFile = zO.files; $("goO").disabled = !oFile; if (oFile) setStatus("statusO", "已就绪,点击开始检索"); } });
+
+const bandOf = r => r >= 0.30 || r >= 70 ? "high" : r >= 0.10 || r >= 45 ? "mid" : "ok";
+const bandTxt = (v, isPct) => (isPct ? (v >= 0.30 ? "高" : v >= 0.10 ? "中" : "低") : (v >= 70 ? "高疑似" : v >= 45 ? "中等疑似" : "低疑似"));
+const dlBlob = (text, name) => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "text/html;charset=utf-8" }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+};
+
+$("goL").onclick = async () => {
+  if (!lpFile || !lrFiles.length) return;
+  setStatus("statusL", "正在比对…"); $("goL").disabled = true;
+  try {
+    const paper = await loadDoc(lpFile);
+    const refs = [];
+    for (const f of lrFiles){ try { refs.push(await loadDoc(f)); } catch(e){} }
+    const kIn = $("kIn").value.trim();
+    const res = localAnalyze(paper, refs, parseInt(kIn) || 0, 0);
+    const cls = bandOf(res.overall);
+    const refRows = res.per.map((pr, i) =>
+      "<tr><td>" + (i + 1) + "</td><td>" + esc(pr.doc.name) + "</td><td>" + pr.doc.tokens.length.toLocaleString() +
+      "</td><td><b>" + (pr.ratio * 100).toFixed(1) + "%</b></td><td>" + res.counts[i] + " 处</td></tr>").join("");
+    const runsHtml = res.runsInfo.length ? res.runsInfo.map(r =>
+      '<div class="run"><div class="meta">长度 ' + r.tokens + ' 词元 · 论文第 ' + r.paras.join("、") + ' 段 · 来源:' + r.sources.map(esc).join("、") + '</div><div><span class="lbl">论文</span>' + r.paperHtml + '</div>' + (r.refHtml ? '<div><span class="lbl">参考</span>' + r.refHtml + "</div>" : "") + "</div>").join("")
+      : '<p class="empty">未发现达到判定窗口的重复内容 🎉</p>';
+    $("resL").innerHTML = `
+     <div class="card verdict"><div><div class="pct ${cls}">${(res.overall * 100).toFixed(1)}%</div><div style="color:var(--sub)">总重复率</div></div>
+      <div><span class="badge ${cls}">${bandTxt(res.overall, true)}</span><div class="meta2">判定窗口:连续 ${res.k} 词元 · 论文 ${paper.tokens.length.toLocaleString()} 词元 · 参考文献 ${refs.length} 篇</div></div></div>
+     <div class="card"><h3>各来源重合度</h3><table><tr><th>#</th><th>参考文献</th><th>词元数</th><th>与论文重合</th><th>匹配片段</th></tr>${refRows}</table></div>
+     <div class="card"><h3>重复片段(共 ${res.runsInfo.length} 处)</h3>${runsHtml}</div>
+     <div class="card"><h3>论文全文(黄色 = 重复)</h3><div class="fulltext">${renderParas(paper, res.union).join("")}</div></div>`;
+    $("resL").hidden = false;
+    setStatus("statusL", "比对完成");
+    $("resL").scrollIntoView({ behavior: "smooth" });
+  } catch(e){ setStatus("statusL", "失败:" + e.message, true); }
+  $("goL").disabled = !(lpFile && lrFiles.length);
+};
+
+$("goA").onclick = async () => {
+  if (!aFile) return;
+  setStatus("statusA", "正在分析…"); $("goA").disabled = true;
+  try {
+    const doc = await loadDoc(aFile);
+    const d = aigcAnalyze(doc);
+    if (!d) throw new Error("论文几乎没有可分析的文本");
+    const cls = d.score >= 70 ? "high" : d.score >= 45 ? "mid" : "ok";
+    const sigRows = d.signals.map(s => "<tr><td>" + esc(s.name) + "</td><td>" + esc(s.value) + "</td><td>" + s.score + "</td></tr>").join("");
+    const framesHtml = d.frames.length ? d.frames.map(f =>
+      '<div class="run"><div class="meta">第 ' + (f.para || "?") + ' 段 · ' + esc(f.label) + "</div>" + esc(f.text) + "</div>").join("")
+      : '<p class="empty">未命中模板短语</p>';
+    $("resA").innerHTML = `
+     <div class="card verdict"><div><div class="pct ${cls}">${d.score}</div><div style="color:var(--sub)">AIGC 疑似度(0-100)</div></div>
+      <div><span class="badge ${cls}">${d.band}</span><div class="meta2">${esc(d.paper.name)} · ${d.sentences_total} 句 · 离线启发式统计</div></div></div>
+     <div class="card"><h3>各信号明细</h3><table><tr><th>信号</th><th>取值</th><th>贡献(0-100)</th></tr>${sigRows}</table></div>
+     <div class="card"><h3>模板短语命中(共 ${d.frames.length} 处)</h3>${framesHtml}</div>
+     <div class="card"><h3>全文标注(橙 = 高疑似句,黄 = 中等疑似句)</h3><div class="fulltext">${d.paragraphs.join("")}</div></div>
+     <div class="card dl"><div class="meta2">⚠️ 启发式统计,不构成 AI 写作的证明;仅作写作风格自查参考。</div></div>`;
+    $("resA").hidden = false;
+    setStatus("statusA", "分析完成");
+    $("resA").scrollIntoView({ behavior: "smooth" });
+  } catch(e){ setStatus("statusA", "失败:" + e.message, true); }
+  $("goA").disabled = !aFile;
+};
+
+$("goO").onclick = async () => {
+  if (!oFile) return;
+  const sources = [...document.querySelectorAll(".ock:checked")].map(c => c.value);
+  if (!sources.length){ setStatus("statusO", "请至少勾选一个检索来源", true); return; }
+  setStatus("statusO", "正在检索…"); $("goO").disabled = true;
+  try {
+    const doc = await loadDoc(oFile);
+    const d = await onlineAnalyze(doc, sources,
+      (done, total, hits, mc) => setStatus("statusO", "已检索 " + done + "/" + total + " 句 · 命中 " + hits + " 处"));
+    const cls = d.ratio >= 0.3 ? "high" : d.ratio >= 0.1 ? "mid" : "ok";
+    const bandT = d.ratio >= 0.3 ? "高" : d.ratio >= 0.1 ? "中" : "低";
+    const labels = { openalex: "OpenAlex 学术库", europepmc: "Europe PMC 开放全文" };
+    const srcRows = Object.entries(d.source_counts).filter(([k, v]) => v).map(([k, v]) =>
+      "<tr><td>" + (labels[k] || k) + "</td><td><b>" + v + "</b> 处</td></tr>").join("");
+    const hitsHtml = d.hit_details.length ? d.hit_details.map(h =>
+      '<div class="run"><div class="meta">第 ' + h.para + ' 段 · 命中 ' + h.matched_len + ' 字</div><div>' + esc(h.text) + "</div>" +
+      h.sources.map(s => '<div class="src">↳ <a href="' + esc(s.url || "#") + '" target="_blank" rel="noreferrer">' + esc(s.title || "") + "</a> <span style=\"color:var(--sub)\">(" + esc(s.source_label) + (s.meta ? " / " + esc(s.meta) : "") + ")</span></div>" + (s.snippet ? '<div class="quote">原文片段:' + esc(s.snippet) + "</div>" : "")).join("") + "</div>").join("")
+      : '<p class="empty">未发现逐字重复的句子 🎉(同义改写无法检出;搜索引擎渠道请用本地版)</p>';
+    $("resO").innerHTML = `
+     <div class="card verdict"><div><div class="pct ${cls}">${(d.ratio * 100).toFixed(1)}%</div><div style="color:var(--sub)">在线重复率(学术库)</div></div>
+      <div><span class="badge ${cls}">${bandT}</span><div class="meta2">检索 ${d.sentences_total} 句,命中 ${d.sentences_matched} 句 · 论文 ${esc(d.paper.name)}</div></div></div>
+     ${srcRows ? '<div class="card"><h3>各来源命中</h3><table><tr><th>来源</th><th>命中</th></tr>' + srcRows + "</table></div>" : ""}
+     <div class="card"><h3>命中片段(共 ${d.hit_details.length} 处)</h3>${hitsHtml}</div>
+     <div class="card dl"><div class="meta2">⚠️ 仅检索开放学术库;搜索引擎渠道、PDF 支持请下载本地版。</div></div>`;
+    $("resO").hidden = false;
+    setStatus("statusO", "检索完成");
+    $("resO").scrollIntoView({ behavior: "smooth" });
+  } catch(e){ setStatus("statusO", "检索失败:" + e.message, true); }
+  $("goO").disabled = !oFile;
+};
+</script>
+</body>
+</html>
