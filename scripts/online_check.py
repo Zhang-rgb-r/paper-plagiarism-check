@@ -23,6 +23,7 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -67,6 +68,40 @@ def match_parts(nkey: str, sentence: str, hay: str):
         pn = norm(part)
         if len(pn) >= MIN_SENT_CHARS and pn in hay:
             return pn, part.strip()
+    return None
+
+
+def _trigrams(s: str) -> set:
+    return {s[i:i + 3] for i in range(len(s) - 2)}
+
+
+FUZZY_THRESHOLD = 0.35   # 3-gram Jaccard 阈值:近似改写检测(实测:轻度改写 0.5-0.85,同领域无关句 ≤0.2)
+
+
+def _best_fuzzy(nkey: str, texts) -> tuple | None:
+    """在候选文本的句子中找与目标句 3-gram 相似度最高者。
+
+    texts: [(meta, 原始文本)];内部按句切分后逐句归一化比较。
+    返回 (相似度, 最相似原句, meta) 或 None。用于捕捉轻度改写
+    (同义替换、语序微调),知网称之为模糊匹配。
+    """
+    g1 = _trigrams(nkey)
+    if len(g1) < 8:
+        return None
+    best = None
+    for meta, raw in texts:
+        if len(raw) < 40:
+            continue
+        for cs_raw in re.split(r"(?<=[.!?。])\s*", raw):
+            cs = norm(cs_raw)
+            if len(cs) < 20:
+                continue
+            g2 = _trigrams(cs)
+            sim = len(g1 & g2) / max(1, len(g1 | g2))
+            if best is None or sim > best[0]:
+                best = (sim, cs_raw.strip(), meta)
+    if best and best[0] >= FUZZY_THRESHOLD:
+        return best
     return None
 
 
@@ -183,16 +218,22 @@ def check_openalex(nkey: str, sentence: str) -> list[dict]:
     _pace("openalex", 0.15)
     data = json.loads(http_get(url, timeout=12).decode("utf-8", "replace"))
     hits = []
+    cand = []
     for w in data.get("results", []):
         title = w.get("display_name") or "(无题名)"
         ab = rebuild_abstract(w.get("abstract_inverted_index"))
         hay = norm(title) + "\x00" + norm(ab)
         m = match_parts(nkey, sentence, hay)
+        cand.append(({"title": title, "url": w.get("doi") or w.get("id"),
+                      "meta": " / ".join(x for x in [
+                          (w.get("publication_year") and str(w["publication_year"])) or "",
+                          ((w.get("primary_location") or {}).get("source") or {}).get("display_name") or "",
+                      ] if x)}, title + "。" + ab))
         if m:
             pn, ptext = m
             raw = title + "。" + ab
             hits.append({
-                "source": "openalex", "source_label": "OpenAlex 学术库",
+                "source": "openalex", "source_label": "OpenAlex 学术库", "kind": "exact",
                 "title": title,
                 "url": w.get("doi") or w.get("id"),
                 "meta": " / ".join(x for x in [
@@ -204,16 +245,29 @@ def check_openalex(nkey: str, sentence: str) -> list[dict]:
             })
             if len(hits) >= 2:
                 break
+    # 无逐字命中时做模糊匹配(改写嫌疑),只取前 8 篇候选
+    if not hits and len(nkey) >= 20:
+        bf = _best_fuzzy(nkey, cand[:8])
+        if bf:
+            sim, cs, meta = bf
+            hits.append({
+                "source": "openalex", "source_label": "OpenAlex 学术库", "kind": "fuzzy",
+                "title": meta["title"], "url": meta["url"], "meta": meta["meta"],
+                "matched_len": int(len(nkey) * sim),
+                "snippet": "疑似改写(相似度 %.0f%%):%s" % (sim * 100, cs[:150]),
+            })
     return hits
 
 
 def _pmc_queries(sentence: str) -> list[str]:
-    """PMC 短语查询对超长短语/连字符词不可靠:整句前缀短语 + 关键词双策略。"""
+    """PMC 短语查询对超长短语/连字符词不可靠:整句前缀短语 + 特征词双策略。"""
     phrase = re.sub(r'["\[\]{}]', " ", sentence).strip()[:110]
     queries = ['"%s"' % phrase]
-    words = [w for w in re.findall(r"[A-Za-z]{2,}", sentence) if w.lower() not in _STOP]
+    words = [w for w in re.findall(r"[A-Za-z]{3,}", sentence)
+             if w.lower() not in _STOP and w.lower() != "abstract"]
+    words.sort(key=len, reverse=True)
     if len(words) >= 4:
-        queries.append(" ".join(words[:8]))
+        queries.append(" ".join(words[:6]))
     return queries
 
 
@@ -222,6 +276,7 @@ def check_europepmc(nkey: str, sentence: str) -> list[dict]:
         return []
     hits: list[dict] = []
     seen_urls: set[str] = set()
+    cand = []
     for qtext in _pmc_queries(sentence):
         if len(hits) >= 2:
             break
@@ -238,17 +293,21 @@ def check_europepmc(nkey: str, sentence: str) -> list[dict]:
             abstract = re.sub(r"<[^>]+>", "", h.get("abstractText") or "")
             raw = title + "。" + abstract
             hay = norm(raw)
+            meta = {"title": title,
+                    "url": "https://europepmc.org/article/%s/%s" % (h.get("source", "MED"), h.get("id", "")),
+                    "meta": " / ".join(x for x in [h.get("journalTitle", ""), h.get("pubYear", "")] if x)}
+            cand.append((meta, raw))
             # PMC 的短语检索带词干匹配,过松;只统计能在题录/摘要中逐字核验的命中
             m = match_parts(nkey, sentence, hay)
             if not m:
                 continue
             pn, ptext = m
-            url_out = "https://europepmc.org/article/%s/%s" % (h.get("source", "MED"), h.get("id", ""))
+            url_out = meta["url"]
             if url_out in seen_urls:
                 continue
             seen_urls.add(url_out)
             hits.append({
-                "source": "europepmc", "source_label": "Europe PMC 开放全文",
+                "source": "europepmc", "source_label": "Europe PMC 开放全文", "kind": "exact",
                 "title": title,
                 "url": url_out,
                 "meta": " / ".join(x for x in [h.get("journalTitle", ""), h.get("pubYear", ""), "摘要"] if x),
@@ -257,6 +316,68 @@ def check_europepmc(nkey: str, sentence: str) -> list[dict]:
             })
             if len(hits) >= 2:
                 break
+    if not hits and cand:
+        bf = _best_fuzzy(nkey, cand[:8])
+        if bf:
+            sim, cs, meta = bf
+            hits.append({
+                "source": "europepmc", "source_label": "Europe PMC 开放全文", "kind": "fuzzy",
+                "title": meta["title"], "url": meta["url"], "meta": meta["meta"],
+                "matched_len": int(len(nkey) * sim),
+                "snippet": "疑似改写(相似度 %.0f%%):%s" % (sim * 100, cs[:150]),
+            })
+    return hits
+
+
+def check_arxiv(nkey: str, sentence: str) -> list[dict]:
+    """arXiv 开放论文库(英文为主):精确短语/关键词候选 + 摘要逐字核验 + 模糊匹配。"""
+    if len(re.findall(r"[A-Za-z]{2,}", sentence)) < 6:
+        return []
+    phrase = re.sub(r'["\[\]{}]', " ", sentence).strip()[:100]
+    q = urllib.parse.quote('all:"%s"' % phrase)
+    url = "https://export.arxiv.org/api/query?search_query=%s&max_results=8" % q
+    _pace("arxiv", 1.0)
+    try:
+        xml = http_get(url, timeout=15).decode("utf-8", "replace")
+        root = ET.fromstring(xml)
+    except Exception:
+        return []
+    ns = {"a": "http://www.w3.org/2005/Atom"}
+    cand = []
+    for e in root.findall("a:entry", ns):
+        title = re.sub(r"\s+", " ", e.findtext("a:title", "", ns) or "").strip() or "(无题名)"
+        summ = re.sub(r"\s+", " ", e.findtext("a:summary", "", ns) or "").strip()
+        link = ""
+        for l in e.findall("a:link", ns):
+            if l.get("href"):
+                link = l.get("href")
+        aid = (e.findtext("a:id", "", ns) or "").strip()
+        meta = {"title": title, "url": link or aid,
+                "meta": "arXiv"}
+        cand.append((meta, title + "。" + summ))
+    hits = []
+    for meta, raw, hay in cand:
+        m = match_parts(nkey, sentence, hay)
+        if m:
+            pn, ptext = m
+            hits.append({
+                "source": "arxiv", "source_label": "arXiv 论文库", "kind": "exact",
+                "title": meta["title"], "url": meta["url"], "meta": "arXiv",
+                "matched_len": len(pn),
+                "snippet": find_window(raw, hay, pn)[:200],
+            })
+            if len(hits) >= 2:
+                break
+    if not hits and cand:
+        bf = _best_fuzzy(nkey, cand[:8])
+        if bf:
+            sim, cs, meta = bf
+            hits.append({
+                "source": "arxiv", "source_label": "arXiv 论文库", "kind": "fuzzy",
+                "title": meta["title"], "url": meta["url"], "meta": "arXiv",
+                "matched_len": int(len(nkey) * sim),
+                "snippet": "疑似改写(相似度 %.0f%%):%s" % (sim * 100, cs[:150]),
+            })
     return hits
 
 
@@ -454,13 +575,24 @@ def run_online_check(paper, sources=("openalex", "europepmc", "web"),
                 with stats_lock:
                     src_stats["web"][1] += 1
                 errs.append("web: %s" % str(e)[:60])
+        if "arxiv" in sources:
+            with stats_lock:
+                src_stats["arxiv"][0] += 1
+            try:
+                hits += check_arxiv(nkey, first["text"])
+            except Exception as e:
+                with stats_lock:
+                    src_stats["arxiv"][1] += 1
+                errs.append("arxiv: %s" % str(e)[:60])
         return nkey, hits, errs
 
     matched_chars = 0
+    fuzzy_chars = 0
     matched_sents: list[dict] = []
     hit_details: list[dict] = []
+    fuzzy_matches: list[dict] = []
     source_counts: dict[str, int] = {}
-    src_stats = {"openalex": [0, 0], "europepmc": [0, 0], "web": [0, 0]}  # [尝试数, 失败数]
+    src_stats = {"openalex": [0, 0], "europepmc": [0, 0], "web": [0, 0], "arxiv": [0, 0]}  # [尝试数, 失败数]
     bing_miss = 0
     done = 0
     total = len(order)
@@ -479,10 +611,12 @@ def run_online_check(paper, sources=("openalex", "europepmc", "web"),
             if bing_miss >= 8 and not _web_disabled.is_set():
                 _web_disabled.set()
                 warnings.append("网页检索连续失败,已自动停用网页来源(可能被限流或断网),结果仅含学术库。")
-            if hits:
-                for h in hits:
+            exact_hits = [h for h in hits if h.get("kind", "exact") == "exact"]
+            fuzzy_hits = [h for h in hits if h.get("kind") == "fuzzy"]
+            if exact_hits:
+                for h in exact_hits:
                     source_counts[h["source"]] = source_counts.get(h["source"], 0) + 1
-                best = max(h.get("matched_len", 0) for h in hits)
+                best = max(h.get("matched_len", 0) for h in exact_hits)
                 first = occurrences[nkey][0]
                 for occ in occurrences[nkey]:
                     matched_sents.append({
@@ -491,9 +625,17 @@ def run_online_check(paper, sources=("openalex", "europepmc", "web"),
                     })
                     matched_chars += best
                 hit_details.append({"text": first["text"], "para": first["para"] + 1,
-                                    "matched_len": best, "sources": hits})
+                                    "matched_len": best, "sources": exact_hits})
+            elif fuzzy_hits:
+                best_h = max(fuzzy_hits, key=lambda h: h.get("matched_len", 0))
+                best = best_h.get("matched_len", 0)
+                for occ in occurrences[nkey]:
+                    fuzzy_chars += best
+                fuzzy_matches.append({"text": first["text"], "para": first["para"] + 1,
+                                      "matched_len": best, "sources": fuzzy_hits})
             if progress:
-                progress(done, total, hit_details[-1] if hits else None)
+                last = hit_details[-1] if hit_details and exact_hits else (fuzzy_matches[-1] if fuzzy_matches else None)
+                progress(done, total, last)
 
     labels = {"openalex": "OpenAlex 学术库", "europepmc": "Europe PMC", "web": "网页检索"}
     for src, (att, fail) in src_stats.items():
@@ -502,6 +644,7 @@ def run_online_check(paper, sources=("openalex", "europepmc", "web"),
 
     matched_sents.sort(key=lambda s: (s["para"], s["start"]))
     ratio = (matched_chars / total_chars) if total_chars else 0.0
+    fuzzy_ratio = (fuzzy_chars / total_chars) if total_chars else 0.0
     return {
         "sentences_total": len(sents),
         "sentences_unique": len(order),
@@ -509,6 +652,9 @@ def run_online_check(paper, sources=("openalex", "europepmc", "web"),
         "matched_chars": matched_chars,
         "total_chars": total_chars,
         "ratio": round(ratio, 4),
+        "fuzzy_matches": fuzzy_matches,
+        "fuzzy": {"chars": fuzzy_chars, "ratio": round(fuzzy_ratio, 4),
+                  "threshold": FUZZY_THRESHOLD},
         "source_counts": source_counts,
         "matched": matched_sents,
         "hit_details": hit_details,
