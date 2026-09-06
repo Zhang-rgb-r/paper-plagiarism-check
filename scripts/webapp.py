@@ -191,7 +191,7 @@ def api_check_local(body: bytes, content_type: str) -> tuple[int, dict]:
         ref_html = html.escape(r["ref_excerpt"]).replace(" ⏎ ", " ¶ ")
         runs_payload.append({
             "tokens": r["tokens"], "paras": r["paras"], "sources": r["sources"],
-            "paper_html": paper_html, "ref_html": ref_html,
+            "kind": r.get("kind", ""), "paper_html": paper_html, "ref_html": ref_html,
         })
     report_html = html_report(paper, res["per_ref"], res["k"], res["overall"],
                               res["union_count"], res["union"], res["counts"], now)
@@ -200,6 +200,8 @@ def api_check_local(body: bytes, content_type: str) -> tuple[int, dict]:
         "warnings": warnings,
         "k": res["k"],
         "overall": res["overall"],
+        "metrics": res.get("metrics"),
+        "sections": res.get("sections"),
         "band": band(res["overall"]),
         "paper": {"name": paper.name, "tokens": len(paper.tokens),
                   "chars": paper.char_count, "paras": len(paper.paras)},
@@ -207,6 +209,8 @@ def api_check_local(body: bytes, content_type: str) -> tuple[int, dict]:
                   "ratio": pr["ratio"], "runs": res["counts"][i]}
                  for i, pr in enumerate(res["per_ref"])],
         "runs": runs_payload,
+        "fuzzy": res.get("fuzzy"),
+        "fuzzy_matches": res.get("fuzzy_matches"),
         "paragraphs": render_paras_html(paper, merge_para_spans(paper, res["union"])),
         "report_html": report_html,
     }
@@ -264,6 +268,17 @@ def build_online_report(paper, res: dict, now: str) -> str:
     if src_rows:
         parts.append("<h2>各来源命中</h2><table>" + src_rows + "</table>")
     parts.append("<h2>命中片段明细</h2>" + ("".join(hits_html) or '<p class="muted">未发现逐字重复的句子。</p>'))
+    if res.get("fuzzy_matches"):
+        f_html = "".join(
+            '<div class="run"><div class="meta">第 %d 段 · 疑似改写 · 命中约 %d 字</div><div>%s</div>%s</div>' % (
+                h["para"], h.get("matched_len", 0), html.escape(h["text"]),
+                "".join('<div class="src">↳ <a href="%s" target="_blank" rel="noreferrer">%s</a> <span class="muted">(%s)</span></div><div class="quote">%s</div>'
+                        % (html.escape(s.get("url") or "", True), html.escape(s.get("title") or ""),
+                           html.escape(s.get("source_label", "")), html.escape(s.get("snippet") or ""))
+                        for s in h.get("sources", [])))
+            for h in res["fuzzy_matches"])
+        parts.append('<h2>疑似改写(模糊匹配,需人工确认)</h2>' + f_html)
+    parts.append('<div class="verdict" style="margin-top:14px">模糊匹配率:%s</div>' % ("%.1f%%" % (res["fuzzy"]["ratio"] * 100) if res.get("fuzzy") else "0%"))
     parts.append("<h2>论文全文(黄色 = 检索命中的句子)</h2>")
     parts.extend(_render_online_paras(paper, res.get("matched", [])))
     parts.append(f'<h2>说明与局限</h2><p class="muted">{html.escape(ONLINE_NOTE)}</p>')
@@ -280,7 +295,7 @@ def api_check_online_start(body: bytes, content_type: str) -> tuple[int, dict]:
     if err:
         return 400, {"ok": False, "error": err}
     sources = [s.strip() for s in _get_field(fields, "sources").split(",") if s.strip()]
-    sources = [s for s in sources if s in ("openalex", "europepmc", "web")] or \
+    sources = [s for s in sources if s in ("openalex", "europepmc", "web", "arxiv")] or \
               ["openalex", "europepmc", "web"]
 
     job_id = uuid.uuid4().hex[:12]
@@ -518,8 +533,9 @@ footer{margin-top:30px;color:var(--sub);font-size:.85em;text-align:center}
   <div class="chips" id="onlinePaperChips"></div>
  </div>
  <div class="srces">检索来源:
-  <label><input type="checkbox" class="srcck" value="openalex" checked>OpenAlex 学术库(2.5 亿篇题录摘要)</label>
+  <label><input type="checkbox" class="srcck" value="openalex" checked>OpenAlex 学术库</label>
   <label><input type="checkbox" class="srcck" value="europepmc" checked>Europe PMC 开放全文</label>
+  <label><input type="checkbox" class="srcck" value="arxiv" checked>arXiv 论文库</label>
   <label><input type="checkbox" class="srcck" value="web" checked>搜索引擎(360/搜狗/Bing,结果逐字核验)</label>
  </div>
  <div class="actions">
@@ -717,7 +733,7 @@ function renderOnline(d){
   $("onlineWarnings").innerHTML = (d.warnings||[]).map(w=>`<div class="warn">⚠️ ${esc(w)}</div>`).join("");
   const cls = d.ratio>=0.3?"high":d.ratio>=0.1?"mid":"ok";
   const bandTxt = d.ratio>=0.3?"高":d.ratio>=0.1?"中":"低";
-  const labels = {openalex:"OpenAlex 学术库", europepmc:"Europe PMC 开放全文", web:"网页检索(已核验)"};
+  const labels = {openalex:"OpenAlex 学术库", europepmc:"Europe PMC 开放全文", web:"网页检索(已核验)", arxiv:"arXiv 论文库"};
   const srcRows = Object.entries(d.source_counts||{}).filter(([k,v])=>v)
     .map(([k,v])=>`<tr><td>${labels[k]||k}</td><td><b>${v}</b> 处</td></tr>`).join("");
   const hitsHtml = (d.hit_details||[]).length ? d.hit_details.map(h=>`
@@ -729,6 +745,14 @@ function renderOnline(d){
         ${s.snippet?`<div class="quote">原文片段:${esc(s.snippet)}</div>`:""}`).join("")}
     </div>`).join("")
     : `<p class="empty">未发现逐字重复的句子 🎉(注意:同义改写无法检出)</p>`;
+  const fuzzyHtml = (d.fuzzy_matches && d.fuzzy_matches.length) ?
+    '<div class="card"><h3>疑似改写 · 模糊匹配(共 ' + d.fuzzy_matches.length + ' 处,相似度 ≥ ' +
+    Math.round((d.fuzzy ? d.fuzzy.threshold : 0.35) * 100) + '%,不计入重复率,需人工确认)</h3>' +
+    d.fuzzy_matches.map(f =>
+      '<div class="run"><div class="meta">第 ' + f.para + ' 段 · 命中约 ' + f.matched_len + ' 字</div><div>' + esc(f.text) + '</div>' +
+      f.sources.map(s => '<div class="src">↳ <a href="' + esc(s.url || "#") + '" target="_blank" rel="noreferrer">' + esc(s.title || "(无标题)") + '</a> <span style="color:var(--sub)">(' + esc(s.source_label || "") + ')</span></div>' +
+        (s.snippet ? '<div class="quote">原文片段:' + esc(s.snippet) + '</div>' : '')).join("") + '</div>').join("") + '</div>'
+    : "";
   $("onlineResult").innerHTML = `
    <div class="card verdict">
      <div><div class="pct ${cls}">${(d.ratio*100).toFixed(1)}%</div><div style="color:var(--sub)">在线重复率</div></div>
@@ -737,7 +761,8 @@ function renderOnline(d){
        检索 ${d.sentences_total} 句,命中 ${d.sentences_matched} 句(重复文字 ${d.matched_chars.toLocaleString()} 字)</div></div>
    </div>
    ${srcRows?`<div class="card"><h3>各来源命中</h3><table><tr><th>来源</th><th>命中</th></tr>${srcRows}</table></div>`:""}
-   <div class="card"><h3>命中片段(共 ${d.hit_details.length} 处)</h3>${hitsHtml}</div>
+   <div class="card"><h3>命中片段(共 ${(d.hit_details||[]).length} 处)</h3>${hitsHtml}</div>
+   ${fuzzyHtml}
    <div class="card"><h3>论文全文(黄色 = 检索命中)</h3><div class="fulltext">${d.paragraphs.join("")}</div></div>
    <div class="card dl"><button id="dlBtnOnline">⬇ 下载完整 HTML 报告</button></div>`;
   $("onlineResult").hidden = false;
@@ -839,18 +864,22 @@ function renderLocal(d){
   const bandTxt = d.overall>=0.3?"高":d.overall>=0.1?"中":"低";
   const refRows = d.refs.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${r.tokens.toLocaleString()}</td>
      <td><b>${(r.ratio*100).toFixed(1)}%</b></td><td>${r.runs} 处</td></tr>`).join("");
-  const runsHtml = d.runs.length ? d.runs.map(r=>`
+  const runsHtml = d.runs.length ? d.runs.map(r => `
     <div class="run">
-      <div class="meta">长度 ${r.tokens} 词元 · 论文第 ${r.paras.join("、")} 段 · 来源:${r.sources.map(esc).join("、")}</div>
+      <div class="meta">${r.kind === "引用" ? "〔合理引用〕" : r.kind === "文献列表" ? "〔文献列表〕" : "〔疑似抄袭〕"}长度 ${r.tokens} 词元 · 论文第 ${r.paras.join("、")} 段 · 来源:${r.sources.map(esc).join("、")}</div>
       <div><span class="lbl">论文</span>${r.paper_html}</div>
       ${r.ref_html?`<div><span class="lbl">参考</span>${r.ref_html}</div>`:""}
     </div>`).join("") : `<p class="empty">未发现达到判定窗口的重复内容 🎉</p>`;
   $("result").innerHTML = `
    <div class="card verdict">
-     <div><div class="pct ${cls}">${(d.overall*100).toFixed(1)}%</div><div style="color:var(--sub)">总重复率</div></div>
+     <div><div class="pct ${cls}">${(d.overall * 100).toFixed(1)}%</div><div style="color:var(--sub)">总文字复制比</div></div>
      <div><span class="badge ${cls}">${bandTxt}</span>
-       <div class="meta2">判定窗口:连续 ${d.k} 词元 · 论文 ${d.paper.tokens.toLocaleString()} 词元 · 参考文献 ${d.refs.length} 篇</div></div>
+       <div class="meta2">去除引用文献后复制比:<b>${((d.metrics ? d.metrics.copy_ratio : d.overall) * 100).toFixed(1)}%</b>
+       ${d.metrics && d.metrics.cited_ratio ? " · 引用率 " + (d.metrics.cited_ratio * 100).toFixed(1) + "%" : ""}<br>
+       判定窗口:连续 ${d.k} 词元 · 论文 ${d.paper.tokens.toLocaleString()} 词元 · 参考文献 ${d.refs.length} 篇</div></div>
    </div>
+   ${d.sections && d.sections.length ? '<div class="card"><h3>分章节复制比</h3><table><tr><th>章节</th><th>复制比</th><th>覆盖/词元</th></tr>' +
+     d.sections.slice(0, 12).map(s => '<tr><td>' + esc(s.title) + '</td><td><b>' + (s.ratio * 100).toFixed(1) + '%</b></td><td>' + s.covered + '/' + s.total + '</td></tr>').join("") + "</table></div>" : ""}
    <div class="card"><h3>各来源重合度</h3><table><tr><th>#</th><th>参考文献</th><th>词元数</th><th>与论文重合</th><th>匹配片段</th></tr>${refRows}</table></div>
    <div class="card"><h3>重复片段(共 ${d.runs.length} 处)</h3>${runsHtml}</div>
    <div class="card"><h3>论文全文(黄色 = 与参考文献重复)</h3><div class="fulltext">${d.paragraphs.join("")}</div></div>
