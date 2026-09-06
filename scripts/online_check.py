@@ -207,36 +207,56 @@ def check_openalex(nkey: str, sentence: str) -> list[dict]:
     return hits
 
 
+def _pmc_queries(sentence: str) -> list[str]:
+    """PMC 短语查询对超长短语/连字符词不可靠:整句前缀短语 + 关键词双策略。"""
+    phrase = re.sub(r'["\[\]{}]', " ", sentence).strip()[:110]
+    queries = ['"%s"' % phrase]
+    words = [w for w in re.findall(r"[A-Za-z]{2,}", sentence) if w.lower() not in _STOP]
+    if len(words) >= 4:
+        queries.append(" ".join(words[:8]))
+    return queries
+
+
 def check_europepmc(nkey: str, sentence: str) -> list[dict]:
     if len(re.findall(r"[A-Za-z]{2,}", sentence)) < 4:  # 中文句在此库无意义,跳过
         return []
-    phrase = re.sub(r'["\[\]{}]', " ", sentence).strip()
-    q = urllib.parse.quote('"%s"' % phrase)
-    url = ("https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=" + q +
-           "&format=json&pageSize=5")
-    _pace("europepmc", 0.3)
-    data = json.loads(http_get(url, timeout=12).decode("utf-8", "replace"))
-    hits = []
-    for h in data.get("resultList", {}).get("result", [])[:3]:
-        title = re.sub(r"<[^>]+>", "", h.get("title") or "(无题名)")
-        abstract = re.sub(r"<[^>]+>", "", h.get("abstractText") or "")
-        raw = title + "。" + abstract
-        hay = norm(raw)
-        # PMC 的全文短语检索带词干匹配,过松;只统计能在题录/摘要中逐字核验的命中
-        m = match_parts(nkey, sentence, hay)
-        if not m:
-            continue
-        pn, ptext = m
-        hits.append({
-            "source": "europepmc", "source_label": "Europe PMC 开放全文",
-            "title": title,
-            "url": "https://europepmc.org/article/%s/%s" % (h.get("source", "MED"), h.get("id", "")),
-            "meta": " / ".join(x for x in [h.get("journalTitle", ""), h.get("pubYear", ""), "摘要"] if x),
-            "matched_len": len(pn),
-            "snippet": find_window(raw, hay, pn)[:200],
-        })
+    hits: list[dict] = []
+    seen_urls: set[str] = set()
+    for qtext in _pmc_queries(sentence):
         if len(hits) >= 2:
             break
+        q = urllib.parse.quote(qtext)
+        url = ("https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=" + q +
+               "&format=json&pageSize=6&resultType=core")
+        _pace("europepmc", 0.3)
+        try:
+            data = json.loads(http_get(url, timeout=12).decode("utf-8", "replace"))
+        except Exception:
+            continue
+        for h in data.get("resultList", {}).get("result", [])[:6]:
+            title = re.sub(r"<[^>]+>", "", h.get("title") or "(无题名)")
+            abstract = re.sub(r"<[^>]+>", "", h.get("abstractText") or "")
+            raw = title + "。" + abstract
+            hay = norm(raw)
+            # PMC 的短语检索带词干匹配,过松;只统计能在题录/摘要中逐字核验的命中
+            m = match_parts(nkey, sentence, hay)
+            if not m:
+                continue
+            pn, ptext = m
+            url_out = "https://europepmc.org/article/%s/%s" % (h.get("source", "MED"), h.get("id", ""))
+            if url_out in seen_urls:
+                continue
+            seen_urls.add(url_out)
+            hits.append({
+                "source": "europepmc", "source_label": "Europe PMC 开放全文",
+                "title": title,
+                "url": url_out,
+                "meta": " / ".join(x for x in [h.get("journalTitle", ""), h.get("pubYear", ""), "摘要"] if x),
+                "matched_len": len(pn),
+                "snippet": find_window(raw, hay, pn)[:200],
+            })
+            if len(hits) >= 2:
+                break
     return hits
 
 
