@@ -395,6 +395,9 @@ def run_online_check(paper, sources=("openalex", "europepmc", "web"),
         occurrences.setdefault(s["nkey"], []).append(s)
         if s["nkey"] not in order:
             order.append(s["nkey"])
+    warnings: list[str] = []
+    if len(sents) >= MAX_SENTS:
+        warnings.append("论文较长,本次仅检索前 %d 句(可分段检测以获得完整覆盖)。" % MAX_SENTS)
     total_chars = sum(len(s["text"]) for s in sents)
     page_cache: dict[str, str] = {}
 
@@ -437,7 +440,6 @@ def run_online_check(paper, sources=("openalex", "europepmc", "web"),
     matched_sents: list[dict] = []
     hit_details: list[dict] = []
     source_counts: dict[str, int] = {}
-    warnings: list[str] = []
     src_stats = {"openalex": [0, 0], "europepmc": [0, 0], "web": [0, 0]}  # [尝试数, 失败数]
     bing_miss = 0
     done = 0
