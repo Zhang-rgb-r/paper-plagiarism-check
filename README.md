@@ -4,6 +4,8 @@
 
 ![AIGC 分析](docs/screenshot-aigc.png)
 
+**🌐 在线演示(GitHub Pages,打开即用):[https://zhang-rgb-r.github.io/paper-plagiarism-check/](https://zhang-rgb-r.github.io/paper-plagiarism-check/)**
+
 ## ✨ 三种模式
 
 | 模式 | 说明 | 是否需要联网 |
