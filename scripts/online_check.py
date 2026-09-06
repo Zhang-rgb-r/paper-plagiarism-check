@@ -398,24 +398,38 @@ def run_online_check(paper, sources=("openalex", "europepmc", "web"),
     total_chars = sum(len(s["text"]) for s in sents)
     page_cache: dict[str, str] = {}
 
+    stats_lock = threading.Lock()
+
     def work(item):
         nkey, first = item
         hits: list[dict] = []
         errs = []
         if "openalex" in sources:
+            with stats_lock:
+                src_stats["openalex"][0] += 1
             try:
                 hits += check_openalex(nkey, first["text"])
             except Exception as e:
+                with stats_lock:
+                    src_stats["openalex"][1] += 1
                 errs.append("openalex: %s" % str(e)[:60])
         if "europepmc" in sources:
+            with stats_lock:
+                src_stats["europepmc"][0] += 1
             try:
                 hits += check_europepmc(nkey, first["text"])
             except Exception as e:
+                with stats_lock:
+                    src_stats["europepmc"][1] += 1
                 errs.append("europepmc: %s" % str(e)[:60])
         if "web" in sources and not _web_disabled.is_set():
+            with stats_lock:
+                src_stats["web"][0] += 1
             try:
                 hits += check_web(nkey, first["text"], page_cache)
             except Exception as e:
+                with stats_lock:
+                    src_stats["web"][1] += 1
                 errs.append("web: %s" % str(e)[:60])
         return nkey, hits, errs
 
@@ -424,6 +438,7 @@ def run_online_check(paper, sources=("openalex", "europepmc", "web"),
     hit_details: list[dict] = []
     source_counts: dict[str, int] = {}
     warnings: list[str] = []
+    src_stats = {"openalex": [0, 0], "europepmc": [0, 0], "web": [0, 0]}  # [尝试数, 失败数]
     bing_miss = 0
     done = 0
     total = len(order)
@@ -434,7 +449,10 @@ def run_online_check(paper, sources=("openalex", "europepmc", "web"),
             nkey, hits, errs = fut.result()
             done += 1
             for e in errs:
-                if e.startswith("web:"):
+                src = e.split(":")[0]
+                if src in src_stats:
+                    src_stats[src][1] += 1
+                if src == "web":
                     bing_miss += 1
             if bing_miss >= 8 and not _web_disabled.is_set():
                 _web_disabled.set()
@@ -454,6 +472,11 @@ def run_online_check(paper, sources=("openalex", "europepmc", "web"),
                                     "matched_len": best, "sources": hits})
             if progress:
                 progress(done, total, hit_details[-1] if hits else None)
+
+    labels = {"openalex": "OpenAlex 学术库", "europepmc": "Europe PMC", "web": "网页检索"}
+    for src, (att, fail) in src_stats.items():
+        if src in sources and att >= 3 and fail == att:
+            warnings.append("%s 本次检索的全部请求都失败了(可能被限流或断网),该来源的结果不完整,建议稍后重试。" % labels[src])
 
     matched_sents.sort(key=lambda s: (s["para"], s["start"]))
     ratio = (matched_chars / total_chars) if total_chars else 0.0
