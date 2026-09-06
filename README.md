@@ -35,14 +35,18 @@ python scripts/check_plagiarism.py --paper 论文.docx --refs 文献目录/ 旧�
     --out 查重报告.md --html 查重报告.html --json 查重结果.json
 ```
 
-### 安装为 ZCode 技能
+### 安装到你的 AI 编程助手(任何 Agent AI 通用)
 
-1. 点本页 **Code → Download ZIP**(或 `git clone` 本仓库)
-2. 解压。⚠️ **注意**:Download ZIP 解压出来的文件夹名是 `paper-plagiarism-check-main`,**必须重命名为 `paper-plagiarism-check`**(技能名与文件夹名一致才能被发现;git clone 的无需改名)
-3. 把文件夹放入以下任一位置:
-   - 个人级:`~/.agents/skills/paper-plagiarism-check/`(Windows 即 `C:\Users\你的用户名\.agents\skills\`)
-   - 项目级:`<你的项目>/.zcode/skills/paper-plagiarism-check/`
-4. **新开一个 ZCode 会话**,直接说"帮我给这篇论文查重"即可自动触发
+本技能遵循 **Agent Skills 开放规范**(SKILL.md),任何支持该规范的 AI 编程工具都能直接使用——ZCode、Claude Code、Cursor、Codex CLI 等。
+
+1. 获取本仓库:`git clone` 本仓库,或点 **Code → Download ZIP**。⚠️ 用 ZIP 的话解压出的文件夹叫 `paper-plagiarism-check-main`,**必须重命名为 `paper-plagiarism-check`**(技能名与文件夹名一致才能被发现;git clone 的无需改名)
+2. 把文件夹放进你的工具的技能目录,常见位置:
+   - **ZCode**:`~/.agents/skills/paper-plagiarism-check/`(Windows 即 `C:\Users\你的用户名\.agents\skills\`),或项目级 `<项目>/.zcode/skills/`
+   - **Claude Code**:`~/.claude/skills/paper-plagiarism-check/`
+   - **其他工具**:查阅该工具文档里 "skills" 的目录约定,把文件夹原样放进去即可
+3. 重启工具或新开会话,直接说"帮我给这篇论文查重"即可自动触发
+
+不想装成技能也行——**脚本本身可以独立使用**:任何能执行命令的 AI 助手都可以直接运行 `python scripts/webapp.py` 启动网页版,或调用 `scripts/check_plagiarism.py` 完成查重,无需任何技能机制。社区安装器(如 `npx skills add Zhang-rgb-r/paper-plagiarism-check`)通常也能自动装进它支持的多个工具。
 
 ## 🔍 检测原理
 
